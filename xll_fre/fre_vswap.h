@@ -40,21 +40,49 @@ namespace fre::vswap {
 		// first derivative at x
 		double derivative(double x_) const
 		{
-			return x_; //!!! fix this
+			size_t i = index(x_);
+			if (i == x.size() - 1) {
+				ensure(x_ > x.back());
+				--i; // use last two points
+			}
+			double m = (y[i + 1] - y[i]) / (x[i + 1] - x[i]);
+			return m; // derivative returns the slope of the piecewise line
 		}
 
 		// second derivative at x[1], ..., x[n-2]
 		std::vector<double> delta()
 		{
-			return std::vector<double>{}; // !!! fix this
+			std::vector<double> deltas;
+			deltas.push_back(0.0); // 0 at beginning of array
+			for (int i = 0; i < x.size() - 2; i++) {
+				double delta_val = derivative(x[i + 1]) - derivative(x[i]); // delta function pushes back the magnitude of the slope change at given points
+				deltas.push_back(delta_val); 
+			}
+			deltas.push_back(0.0); // 0 at end of array
+			return deltas; 
 		}
 	};
 
 	// par variance given strikes, put, and call prices
 	// use put prices for strikes < forward and call prices for strikes >= forward
 	double variance(double f, size_t n, const double* k, const double* p, double* c)
-	{
-		return f*n*k[0]*p[0]*c[0]; // !!! fix this
+	{	
+		double var_swap = 0; // value of variance swap
+		double* v = new double[n]; // initialize v(x) function to get y vector for pwlinear curve
+		for (size_t i = 0; i < n; i++) {
+			v[i] = -2 * log(k[i] / f) + 2 * (k[i] - f) / f; // populate v(x) function
+		}
+		pwlinear func(n,k,v); // instantiate piecewise linear curve
+		delete[] v;
+		for (size_t i = 0; i < n; i++) {
+			if (k[i] < f) { 
+				var_swap = var_swap + p[i] * func.delta()[i]; // if strike is less than forward, multiply put price by the delta function and add to total var_swap 
+			}
+			else {
+				var_swap = var_swap + c[i] * func.delta()[i]; // if strike is greater than or equal to forward, multiply call price by the delta function and add to total var_swap
+			}
+		}
+		return var_swap; // final var_swap value
 	}
 
 } // namespace fre::vswap
